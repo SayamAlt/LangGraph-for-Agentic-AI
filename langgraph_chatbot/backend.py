@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
@@ -36,4 +36,3 @@ checkpointer = InMemorySaver()
 
 # Compile the graph
 chatbot = graph.compile(checkpointer=checkpointer)
-    
