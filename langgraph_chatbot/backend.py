@@ -36,3 +36,10 @@ checkpointer = InMemorySaver()
 
 # Compile the graph
 chatbot = graph.compile(checkpointer=checkpointer)
+
+# config = {'configurable': {'thread_id': 'thread-1'}}
+
+# response = chatbot.invoke({'messages': [HumanMessage(content="Hi, my name is Sayam")]}, config=config, stream_mode='messages')
+
+# # print([message_chunk.content for message_chunk, metadata in response if message_chunk.content])
+# print(chatbot.get_state(config=config).values)
