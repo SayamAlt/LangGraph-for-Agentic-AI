@@ -1,6 +1,6 @@
 import streamlit as st
-from backend_db_integration import chatbot, retrieve_all_threads
-from langchain_core.messages import HumanMessage
+from backend_db_tool_integrated import chatbot, retrieve_all_threads
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from uuid import uuid4
 
 def generate_thread_id():
@@ -55,6 +55,8 @@ for thread_id in st.session_state['chat_threads'][::-1]:
         for message in messages:
             if isinstance(message, HumanMessage):
                 role = 'user'
+            elif isinstance(message, ToolMessage):
+                continue  # Skip tool messages
             else:
                 role = 'assistant'
             previous_messages.append({"role": role, "content": message.content})  
@@ -63,6 +65,11 @@ for thread_id in st.session_state['chat_threads'][::-1]:
 
 # Displaying conversation history
 for message in st.session_state['message_history']:
+    content = message.get("content")
+    # Skip if content is None or empty string
+    if not content or (isinstance(content, str) and content.strip() == ""):
+        continue
+    
     with st.chat_message(message['role']):
         st.text(message['content'])
         
@@ -79,14 +86,54 @@ if user_input:
               "metadata": {'thread_id': st.session_state['thread_id']},
               "run_name": 'chat_turn'}
     
+    # with st.chat_message("assistant"):
+    #     ai_message = st.write_stream(
+    #         message_chunk.content for message_chunk, metadata in chatbot.stream(
+    #             {"messages": [HumanMessage(content=user_input)]}, 
+    #             config=CONFIG, 
+    #             stream_mode="messages") 
+    #         if message_chunk.content
+    #     )
+    
+    # Add the AI message to chat history
     with st.chat_message("assistant"):
-        ai_message = st.write_stream(
-            message_chunk.content for message_chunk, metadata in chatbot.stream(
-                {"messages": [HumanMessage(content=user_input)]}, 
-                config=CONFIG, 
-                stream_mode="messages") 
-            if message_chunk.content
-        )
+        status_holder = {"box": None} # Use a mutable status holder so that the streaming generator can modify it later
+        def stream_ai_message():
+            for message_chunk, metadata in chatbot.stream(
+                {"messages": [HumanMessage(content=user_input)]},
+                config=CONFIG,
+                stream_mode="messages"
+            ):
+                # Lazily create and update the status holder when any tool is invoked
+                if isinstance(message_chunk, ToolMessage):
+                    tool_name = getattr(message_chunk, "name", "tool")
+                    
+                    if status_holder["box"] is None:
+                        status_holder["box"] = st.status(
+                            label=f"🔧 Using `{tool_name}` …",
+                            expanded=True
+                        )
+                    else:
+                        status_holder["box"].update(
+                            label=f"🔧 Using `{tool_name}` …",
+                            state="running",
+                            expanded=True
+                        )
+                
+                # Check if message chunk is an AI message and has content 
+                if isinstance(message_chunk, AIMessage) and isinstance(message_chunk.content, str):
+                    # yield only AI message tokens
+                    yield message_chunk.content
+                    
+        ai_message = st.write_stream(stream_ai_message())
+        
+        # Finalize only if a tool was actually used
+        if status_holder["box"] is not None:
+            status_holder["box"].update(
+                label=f"✅ Tool finished",
+                state="complete",
+                expanded=False
+            )
         
     # Add assistant response to message history
     st.session_state['message_history'].append({"role": "assistant", "content": ai_message})  

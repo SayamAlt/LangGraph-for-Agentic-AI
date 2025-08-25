@@ -33,7 +33,7 @@ graph.add_edge(START, 'chat_node')
 graph.add_edge('chat_node', END)
 
 # Create a SQLite database
-conn = sqlite3.connect(database='chatbot.db', check_same_thread=False) # check_same_thread=False is required for SQLite as our LangGraph chatbot is multi-threaded for multiple conversations
+conn = sqlite3.connect(database='chatbot.db', check_same_thread=False) # check_same_thread=False is required for SQLite as our LangGraph chatbot is multi-threaded to facilitate multiple conversations
 
 # Create a checkpoint saver
 checkpointer = SqliteSaver(conn=conn)
