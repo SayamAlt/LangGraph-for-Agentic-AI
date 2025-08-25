@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
@@ -7,17 +7,30 @@ from typing import TypedDict, Annotated
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_core.tools import tool
-from langchain_community.tools import DuckDuckGoSearchRun
+from tavily import TavilyClient
 import sqlite3, requests, os
 
 load_dotenv()
 
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+WEATHERSTACK_API_ACCESS_KEY = os.getenv("WEATHERSTACK_API_ACCESS_KEY")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 llm = ChatOpenAI()
 
 # Create a web search tool
-web_search = DuckDuckGoSearchRun()
+web_search = TavilyClient(api_key=TAVILY_API_KEY)
+
+@tool
+def web_search_tool(query: str) -> dict:
+    """
+        A tool for performing web searches using the Tavily API.
+    """
+    try:
+        response = web_search.search(query)
+        return response
+    except Exception as e:
+        print(f"Error occurred: {e}")
 
 @tool
 def calculator(first_num: float, second_num: float, operation: Annotated[str, "add, subtract, multiply, divide"]) -> float:
@@ -53,9 +66,21 @@ def get_stock_price(symbol: str) -> dict:
         return response.json() 
     except Exception as e:
         print(f"Error occurred: {e}")
-       
+        
+@tool
+def get_weather_data(city: str) -> dict:
+    """
+        Fetches the current weather data for a given city using the WeatherStack API.
+    """
+    try:
+       url = f"http://api.weatherstack.com/current?access_key={WEATHERSTACK_API_ACCESS_KEY}&query={city}"
+       response = requests.get(url)
+       return response.json()
+    except Exception as e:
+       print(f"Error occurred: {e}")
+
 # Create a list of tools
-tools = [web_search, calculator, get_stock_price]
+tools = [web_search_tool, calculator, get_stock_price, get_weather_data]
 
 # Bind LLM to tools
 llm_with_tools = llm.bind_tools(tools)
