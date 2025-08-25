@@ -98,6 +98,7 @@ if user_input:
     # Add the AI message to chat history
     with st.chat_message("assistant"):
         status_holder = {"box": None} # Use a mutable status holder so that the streaming generator can modify it later
+        
         def stream_ai_message():
             for message_chunk, metadata in chatbot.stream(
                 {"messages": [HumanMessage(content=user_input)]},
